@@ -273,8 +273,8 @@
     let pollCount = 0;
     const maxPolls = 15; // 15 polls × 2 seconds = 30 seconds max
     
-    // Use direct WSL gateway URL for polling (not CORS proxy)
-    const gatewayDirectUrl = 'http://172.30.81.57:3333';
+    // Use the configured gateway URL for polling (auto-discovered or user-configured)
+    const gatewayDirectUrl = $gatewayConfig.url;
     
     pollingInterval = window.setInterval(async () => {
       pollCount++;

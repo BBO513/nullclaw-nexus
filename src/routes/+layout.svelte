@@ -4,20 +4,35 @@
 	import OfflineIndicator from '$lib/components/OfflineIndicator.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import { onMount } from 'svelte';
-	import { gatewayConfig } from '$lib/stores/gateway';
+	import { gatewayConfig, autoDiscoverGateway } from '$lib/stores/gateway';
 	import { GatewayAPI } from '$lib/api/gateway';
+	import { isTauri, onGatewayStarted } from '$lib/tauri';
 	import { get } from 'svelte/store';
 
 	let autoPairingAttempted = false;
 
 	onMount(async () => {
-		// Unregister all service workers to prevent caching issues
-		if ('serviceWorker' in navigator) {
+		// Unregister all service workers to prevent caching issues (not needed in Tauri)
+		if (!isTauri() && 'serviceWorker' in navigator) {
 			navigator.serviceWorker.getRegistrations().then((registrations) => {
 				for (let registration of registrations) {
 					registration.unregister();
 					console.log('[PWA] Service Worker unregistered');
 				}
+			});
+		}
+
+		// Auto-discover gateway (tries multiple ports, works in both Tauri and browser)
+		const discoveredUrl = await autoDiscoverGateway();
+		if (discoveredUrl) {
+			console.log('[Gateway] Connected to:', discoveredUrl);
+		}
+
+		// In Tauri, listen for gateway-started events from the sidecar
+		if (isTauri()) {
+			onGatewayStarted((url) => {
+				console.log('[Tauri] Gateway sidecar started at:', url);
+				gatewayConfig.update(c => ({ ...c, url, connected: true }));
 			});
 		}
 
@@ -38,12 +53,12 @@
 						paired: true,
 						connected: true
 					}));
-					console.log('[Auto-Pair] ✅ Successfully auto-paired with master key');
+					console.log('[Auto-Pair] Successfully auto-paired with master key');
 				} else {
-					console.log('[Auto-Pair] ⚠️ Master key pairing failed, user will need to pair manually');
+					console.log('[Auto-Pair] Master key pairing failed, user will need to pair manually');
 				}
 			} catch (error) {
-				console.log('[Auto-Pair] ⚠️ Auto-pairing failed:', error);
+				console.log('[Auto-Pair] Auto-pairing failed:', error);
 				// Silent fail - user can pair manually later
 			}
 		}
