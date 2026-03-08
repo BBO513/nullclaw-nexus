@@ -12,3 +12,8 @@ nullclaw.exe
 nullclaw
 gateway.log
 gateway_restart.log
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/nullclaw*
+!src-tauri/binaries/.gitkeep

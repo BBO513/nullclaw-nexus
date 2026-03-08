@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { discoverGateway, isTauri } from '$lib/tauri';
 
 export interface GatewayConfig {
   url: string;
@@ -9,10 +10,13 @@ export interface GatewayConfig {
   paired: boolean;
 }
 
+// Default gateway URL — in Tauri, auto-discovery will override this
+const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:3000';
+
 // Load from localStorage if available
 function loadGatewayConfig(): GatewayConfig {
-  const defaultConfig = {
-    url: 'http://127.0.0.1:3001', // CORS proxy for browser access
+  const defaultConfig: GatewayConfig = {
+    url: DEFAULT_GATEWAY_URL,
     connected: false,
     provider: 'ollama',
     model: 'llama3.1',
@@ -31,20 +35,29 @@ function loadGatewayConfig(): GatewayConfig {
     }
     
     const config = JSON.parse(stored);
-    
-    // AUTO-MIGRATION: Fix old URL (port 3000) to use CORS proxy (port 3001)
-    if (config.url === 'http://127.0.0.1:3000') {
-      console.log('[Gateway] Auto-migrating URL from :3000 to :3001 (CORS proxy)');
-      config.url = 'http://127.0.0.1:3001';
-      // Save the migrated config immediately
-      localStorage.setItem('gatewayConfig', JSON.stringify(config));
-    }
-    
     return config;
   } catch (error) {
     console.error('Failed to load gateway config from localStorage:', error);
     return defaultConfig;
   }
+}
+
+/**
+ * Auto-discover gateway URL by probing known ports.
+ * Called from layout on mount. Updates the store if a gateway is found.
+ */
+export async function autoDiscoverGateway(): Promise<string | null> {
+  try {
+    const url = await discoverGateway();
+    if (url) {
+      console.log('[Gateway] Auto-discovered gateway at:', url);
+      gatewayConfig.update(c => ({ ...c, url, connected: true }));
+      return url;
+    }
+  } catch (e) {
+    console.warn('[Gateway] Auto-discovery failed:', e);
+  }
+  return null;
 }
 
 const initial: GatewayConfig = loadGatewayConfig();
