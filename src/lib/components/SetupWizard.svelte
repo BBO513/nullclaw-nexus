@@ -332,7 +332,7 @@
           <div>
             <h2 class="text-2xl font-bold mb-4">Connect to Gateway</h2>
             <p class="text-gray-400 mb-6">
-              Enter your NullClaw gateway URL. The default is http://127.0.0.1:3001 (CORS proxy).
+              Enter your NullClaw gateway URL. The default is http://127.0.0.1:3000.
             </p>
 
             <div class="mb-6">
@@ -341,7 +341,7 @@
                 id="gateway-url"
                 type="text"
                 bind:value={gatewayUrl}
-                placeholder="http://127.0.0.1:3001"
+                placeholder="http://127.0.0.1:3000"
                 class="w-full glass px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
               />
             </div>

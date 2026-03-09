@@ -239,7 +239,7 @@
                 id="gateway-url"
                 type="text"
                 bind:value={gatewayUrl}
-                placeholder="http://127.0.0.1:3001"
+                placeholder="http://127.0.0.1:3000"
                 class="flex-1 glass px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
               />
               <button

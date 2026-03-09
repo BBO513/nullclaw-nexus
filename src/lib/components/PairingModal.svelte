@@ -34,7 +34,7 @@
         error = 'Master key pairing failed. Please check that the CORS proxy is running.';
       }
     } catch (err) {
-      error = 'Failed to connect to gateway. Please check that the CORS proxy is running on port 3001.';
+      error = 'Failed to connect to gateway. Please check that NullClaw is running.';
     } finally {
       pairing = false;
     }
