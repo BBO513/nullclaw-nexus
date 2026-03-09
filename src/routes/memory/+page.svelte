@@ -5,14 +5,14 @@
   import { license } from '$lib/stores/license';
   import { GatewayAPI } from '$lib/api/gateway';
 
-  let mounted = false;
-  let dragOver = false;
-  let selectedMemory: Memory | null = null;
-  let editContent = '';
-  let injecting = false;
-  let toastMessage = '';
-  let toastType: 'success' | 'error' = 'success';
-  let showToast = false;
+  let mounted = $state(false);
+  let dragOver = $state(false);
+  let selectedMemory: Memory | null = $state(null);
+  let editContent = $state('');
+  let injecting = $state(false);
+  let toastMessage = $state('');
+  let toastType: 'success' | 'error' = $state('success');
+  let showToast = $state(false);
 
   onMount(() => {
     mounted = true;
