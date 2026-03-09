@@ -143,9 +143,10 @@
           saveMessages();
         }
       } else {
-        // Direct mode: Use Ollama's OpenAI-compatible endpoint with streaming
-        console.log('🚀 Sending to Ollama /v1/chat/completions (direct mode)');
-        console.log('📝 Message:', userMessage);
+        // Direct mode: Stream through NullClaw gateway
+        const gatewayUrl = $gatewayConfig.url || 'http://127.0.0.1:3000';
+        const model = $gatewayConfig.model || 'llama3.1';
+        console.log(`Sending to ${gatewayUrl}/v1/chat/completions (streaming, model: ${model})`);
         
         streaming = true;
         
@@ -160,14 +161,14 @@
         messages = [...messages, currentStreamAssistantMessage];
         
         try {
-          // Use Ollama's OpenAI-compatible endpoint
-          const response = await fetch('http://localhost:11434/v1/chat/completions', {
+          // Route through NullClaw gateway — it handles provider routing
+          const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'llama3.1',
+              model,
               messages: [
                 ...messages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
                 { role: 'user', content: userMessage }
@@ -178,9 +179,9 @@
 
           if (!response.ok) {
             if (response.status === 0 || response.status === 404) {
-              throw new Error('Ollama not running. Run `ollama serve` and pull llama3.1 model.');
+              throw new Error('NullClaw gateway not running. Run `nullclaw serve` first.');
             }
-            throw new Error(`Ollama error: ${response.status} ${response.statusText}`);
+            throw new Error(`Gateway error: ${response.status} ${response.statusText}`);
           }
 
           // Stream the response
@@ -236,8 +237,8 @@
           
           // Update error message with helpful instructions
           let errorContent = `Error: ${errorMsg}`;
-          if (errorMsg.includes('Ollama not running') || errorMsg.includes('Failed to fetch')) {
-            errorContent = `Ollama not running. Please:\n1. Run \`ollama serve\` in terminal\n2. Pull model: \`ollama pull llama3.1\`\n3. Refresh this page`;
+          if (errorMsg.includes('gateway not running') || errorMsg.includes('Failed to fetch')) {
+            errorContent = `NullClaw gateway not reachable. Please:\n1. Run \`nullclaw serve\` in terminal\n2. Make sure Ollama is running: \`ollama serve\`\n3. Refresh this page`;
           }
           
           // Update error message
@@ -385,7 +386,7 @@
     } else {
       messages = [...messages, {
         role: 'assistant',
-        content: 'Switched to Direct mode (Ollama/local). Messages will be streamed directly from Ollama.',
+        content: 'Switched to Direct mode. Messages will stream through NullClaw Gateway to your configured provider.',
         timestamp: new Date()
       }];
     }
@@ -464,7 +465,7 @@
               <span class="text-yellow-400">⚠️ Gateway not connected/paired</span>
             {/if}
           {:else}
-            <span class="text-green-400">✅ Direct Ollama mode - Using llama3.1 model</span>
+            <span class="text-green-400">✅ Streaming via NullClaw Gateway - Model: {$gatewayConfig.model || 'llama3.1'}</span>
           {/if}
         </div>
         
@@ -472,7 +473,7 @@
           {#if chatMode === 'async'}
             {$gatewayConfig.url}
           {:else}
-            http://localhost:11434/v1/chat/completions
+            {$gatewayConfig.url || 'http://127.0.0.1:3000'}/v1/chat/completions
           {/if}
         </div>
       </div>
@@ -496,7 +497,7 @@
         <div class="max-w-7xl mx-auto text-sm text-green-400 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="animate-pulse">✨</div>
-            <span>Streaming reply from Ollama...</span>
+            <span>Streaming reply via NullClaw Gateway...</span>
           </div>
           <div class="text-xs text-green-300">
             Direct mode
