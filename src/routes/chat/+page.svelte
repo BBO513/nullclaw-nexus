@@ -2,16 +2,16 @@
   import { onMount, onDestroy } from 'svelte';
   import { gatewayConfig } from '$lib/stores/gateway';
 
-  let mounted = false;
-  let messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }> = [];
-  let inputMessage = '';
-  let sending = false;
-  let polling = false;
-  let pollingInterval: number | null = null;
-  let sessionId = 'current-session';
-  let chatMode: 'async' | 'direct' = 'direct'; // 'async' for gateway webhook, 'direct' for Ollama
-  let streaming = false;
-  let currentStreamAssistantMessage: { role: 'assistant'; content: string; timestamp: Date } | null = null;
+  let mounted = $state(false);
+  let messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }> = $state([]);
+  let inputMessage = $state('');
+  let sending = $state(false);
+  let polling = $state(false);
+  let pollingInterval: number | null = $state(null);
+  let sessionId = $state('current-session');
+  let chatMode: 'async' | 'direct' = $state('direct'); // 'async' for gateway webhook, 'direct' for Ollama
+  let streaming = $state(false);
+  let currentStreamAssistantMessage: { role: 'assistant'; content: string; timestamp: Date } | null = $state(null);
 
   onMount(async () => {
     mounted = true;
