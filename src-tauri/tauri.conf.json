@@ -50,14 +50,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "nullclaw",
-          "cmd": "binaries/nullclaw",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
