@@ -484,7 +484,7 @@
         <div class="max-w-7xl mx-auto text-sm text-blue-400 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <div class="animate-spin">⏳</div>
-            <span>Waiting for agent reply... (polling http://172.30.81.57:3333/session/{sessionId}/messages every 2s)</span>
+            <span>Waiting for agent reply... (polling {$gatewayConfig.url}/session/{sessionId}/messages every 2s)</span>
           </div>
           <div class="text-xs text-blue-300">
             Session: {sessionId.slice(0, 16)}...
@@ -515,9 +515,9 @@
             <p>Send a message to begin chatting</p>
             
             {#if chatMode === 'async'}
-              <p class="text-sm mt-2">Using gateway at {$gatewayConfig.url} (CORS proxy)</p>
+              <p class="text-sm mt-2">Using gateway at {$gatewayConfig.url}</p>
               <div class="mt-4 text-xs text-gray-500 space-y-1">
-                <p>Async mode: POST to /webhook → polling http://172.30.81.57:3333/session/{sessionId}/messages</p>
+                <p>Async mode: POST to /webhook → polling {$gatewayConfig.url}/session/{sessionId}/messages</p>
                 <p>Session ID: {sessionId}</p>
                 <p class="text-yellow-400">Note: Session endpoint may not be implemented yet - if polling fails, check gateway logs</p>
               </div>
