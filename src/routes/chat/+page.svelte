@@ -170,10 +170,7 @@
             },
             body: JSON.stringify({
               model,
-              messages: [
-                ...messages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
-                { role: 'user', content: userMessage }
-              ],
+              messages: messages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
               stream: true
             })
           });
