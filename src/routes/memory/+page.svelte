@@ -151,8 +151,8 @@
         {/if}
         
         <!-- Active memories summary -->
-        {@const activeCount = $memories.filter(m => m.active).length}
         {#if $memories.length > 0}
+          {@const activeCount = $memories.filter(m => m.active).length}
           <div class="flex items-center gap-4 mt-4">
             <span class="text-sm text-nebula-accent">
               {activeCount}/{$memories.length} memories active in chat context
