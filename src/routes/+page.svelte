@@ -43,12 +43,10 @@
       gatewayConfig.update(c => ({ ...c, connected: true }));
     } else {
       // Fall back to health check
+      gatewayStatus = null;
       const healthy = await api.checkHealth();
       connected = healthy;
       gatewayConfig.update(c => ({ ...c, connected: healthy }));
-      if (!healthy) {
-        gatewayStatus = null;
-      }
     }
   }
 
