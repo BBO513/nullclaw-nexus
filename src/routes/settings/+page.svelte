@@ -28,6 +28,7 @@
   let syncStatus: 'idle' | 'success' | 'error' = 'idle';
   let syncMessage = '';
   let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+  let syncingFromGateway = false;
 
   onMount(async () => {
     mounted = true;
@@ -50,6 +51,7 @@
       const providerConfig = await api.getProviderConfig();
       if (providerConfig) {
         console.log('[Settings] Loaded provider config from gateway:', providerConfig);
+        syncingFromGateway = true;
         // Update local state to match gateway
         if (providerConfig.type && providerConfig.type !== selectedProvider) {
           selectedProvider = providerConfig.type;
@@ -60,9 +62,11 @@
           gatewayConfig.update(c => ({ ...c, model: providerConfig.model }));
         }
         updateModelList();
+        syncingFromGateway = false;
       }
     } catch (err) {
       console.warn('[Settings] Could not fetch provider config from gateway:', err);
+      syncingFromGateway = false;
     }
   });
 
@@ -83,10 +87,15 @@
       default:
         modelList = [];
     }
-    // Preserve gateway-synced models that aren't in the hardcoded list
+    // Handle models not in the hardcoded list
     if (selectedModel && modelList.length > 0 && !modelList.includes(selectedModel)) {
-      // Model doesn't belong to this provider — reset to first available
-      selectedModel = modelList[0];
+      if (syncingFromGateway) {
+        // Preserve gateway-synced models (e.g. fine-tuned or versioned models)
+        modelList = [selectedModel, ...modelList];
+      } else {
+        // User switched providers — reset to first available model
+        selectedModel = modelList[0];
+      }
     }
     // Auto-select first model only if no model is selected
     if (modelList.length > 0 && !selectedModel) {
