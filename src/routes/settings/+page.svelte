@@ -42,7 +42,7 @@
     }
     
     updateModelList();
-    checkOllama();
+    await checkOllama();
 
     // Fetch current provider config from gateway to sync state
     try {
@@ -73,10 +73,6 @@
       case 'ollama':
         // Use detected models from local Ollama, fallback to common models if none detected
         modelList = availableOllamaModels.length > 0 ? availableOllamaModels : ollamaModels;
-        // Auto-select first available model if current selection not in list
-        if (modelList.length > 0 && !modelList.includes(selectedModel)) {
-          selectedModel = modelList[0];
-        }
         break;
       case 'openai':
         modelList = openaiModels;
@@ -86,6 +82,14 @@
         break;
       default:
         modelList = [];
+    }
+    // Preserve gateway-synced models that aren't in the hardcoded list
+    if (selectedModel && modelList.length > 0 && !modelList.includes(selectedModel)) {
+      modelList = [...modelList, selectedModel];
+    }
+    // Auto-select first model only if no model is selected
+    if (modelList.length > 0 && !selectedModel) {
+      selectedModel = modelList[0];
     }
   }
 
