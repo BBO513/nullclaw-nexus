@@ -15,6 +15,18 @@
  * handles 404 responses for future endpoints.
  */
 
+export interface GatewayStatus {
+  status: string;
+  version: string;
+  uptime_seconds: number;
+  provider: {
+    type: string;
+    base_url: string;
+    model: string;
+    has_api_key: boolean;
+  };
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -44,6 +56,18 @@ export class GatewayAPI {
       headers['Authorization'] = `Bearer ${this.bearerToken}`;
     }
     return headers;
+  }
+
+  async getStatus(): Promise<GatewayStatus | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/status`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 
   async checkHealth(): Promise<boolean> {
