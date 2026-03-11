@@ -88,6 +88,10 @@
     if (status) {
       gatewayUptime = status.uptime_seconds;
       gatewayVersion = status.version;
+    } else {
+      // Clear stale values when gateway is unreachable
+      gatewayUptime = 0;
+      gatewayVersion = '';
     }
   }
 
