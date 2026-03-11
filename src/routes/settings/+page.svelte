@@ -24,8 +24,11 @@
   let modelList: string[] = [];
   let apiKey = '';
   let customBaseUrl = '';
+  let syncing = false;
+  let syncStatus: 'idle' | 'success' | 'error' = 'idle';
+  let syncMessage = '';
 
-  onMount(() => {
+  onMount(async () => {
     mounted = true;
     gatewayUrl = $gatewayConfig.url;
     selectedProvider = $gatewayConfig.provider;
@@ -39,6 +42,27 @@
     
     updateModelList();
     checkOllama();
+
+    // Fetch current provider config from gateway to sync state
+    try {
+      const api = new GatewayAPI($gatewayConfig.url, $gatewayConfig.bearerToken);
+      const providerConfig = await api.getProviderConfig();
+      if (providerConfig) {
+        console.log('[Settings] Loaded provider config from gateway:', providerConfig);
+        // Update local state to match gateway
+        if (providerConfig.type && providerConfig.type !== selectedProvider) {
+          selectedProvider = providerConfig.type;
+          gatewayConfig.update(c => ({ ...c, provider: providerConfig.type }));
+        }
+        if (providerConfig.model && providerConfig.model !== selectedModel) {
+          selectedModel = providerConfig.model;
+          gatewayConfig.update(c => ({ ...c, model: providerConfig.model }));
+        }
+        updateModelList();
+      }
+    } catch (err) {
+      console.warn('[Settings] Could not fetch provider config from gateway:', err);
+    }
   });
 
   function updateModelList() {
@@ -87,7 +111,39 @@
     checking = false;
   }
 
-  function saveSettings() {
+  /** Resolve the provider's upstream base URL for the gateway */
+  function getProviderBaseUrl(provider: string): string {
+    if (provider === 'custom' || provider === 'azure') {
+      return customBaseUrl || '';
+    }
+    const urls: Record<string, string> = {
+      ollama: 'http://localhost:11434',
+      openai: 'https://api.openai.com/v1',
+      anthropic: 'https://api.anthropic.com/v1',
+      groq: 'https://api.groq.com/openai/v1',
+      together: 'https://api.together.xyz/v1',
+      openrouter: 'https://openrouter.ai/api/v1',
+      cohere: 'https://api.cohere.ai/v1',
+      mistral: 'https://api.mistral.ai/v1',
+      perplexity: 'https://api.perplexity.ai',
+      deepseek: 'https://api.deepseek.com/v1',
+      google: 'https://generativelanguage.googleapis.com/v1',
+      huggingface: 'https://api-inference.huggingface.co/models',
+      replicate: 'https://api.replicate.com/v1',
+      anyscale: 'https://api.endpoints.anyscale.com/v1',
+      fireworks: 'https://api.fireworks.ai/inference/v1',
+      deepinfra: 'https://api.deepinfra.com/v1/openai',
+      lepton: 'https://api.lepton.ai/api/v1',
+      octoai: 'https://text.octoai.run/v1',
+      novita: 'https://api.novita.ai/v3/openai',
+      cerebras: 'https://api.cerebras.ai/v1',
+      sambanova: 'https://api.sambanova.ai/v1',
+    };
+    return urls[provider] || '';
+  }
+
+  async function saveSettings() {
+    // Update local store
     gatewayConfig.update(c => ({ 
       ...c, 
       url: gatewayUrl,
@@ -104,8 +160,36 @@
         localStorage.setItem('customBaseUrl', customBaseUrl);
       }
     }
-    
-    alert('✅ Settings saved!');
+
+    // Sync to gateway via POST /config/provider
+    syncing = true;
+    syncStatus = 'idle';
+    try {
+      const api = new GatewayAPI(gatewayUrl, $gatewayConfig.bearerToken);
+      const providerPayload: Record<string, string> = {
+        type: selectedProvider,
+        base_url: getProviderBaseUrl(selectedProvider),
+        model: selectedModel,
+      };
+      if (apiKey) {
+        providerPayload.api_key = apiKey;
+      }
+      const result = await api.updateProvider(providerPayload as { type: string; base_url: string; model: string; api_key?: string });
+      if (result.success) {
+        syncStatus = 'success';
+        syncMessage = 'Settings saved & synced to gateway';
+      } else {
+        syncStatus = 'error';
+        syncMessage = `Saved locally. Gateway sync failed: ${result.message}`;
+      }
+    } catch {
+      syncStatus = 'error';
+      syncMessage = 'Saved locally. Could not reach gateway to sync.';
+    }
+    syncing = false;
+
+    // Clear sync status after 4 seconds
+    setTimeout(() => { syncStatus = 'idle'; }, 4000);
   }
 
   async function checkOllama() {
@@ -439,19 +523,33 @@
         {/if}
       </section>
 
+      <!-- Sync Status Banner -->
+      {#if syncStatus === 'success'}
+        <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-6 flex items-center gap-3">
+          <span class="text-green-500 text-xl">&#10003;</span>
+          <p class="text-green-400 font-semibold">{syncMessage}</p>
+        </div>
+      {:else if syncStatus === 'error'}
+        <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6 flex items-center gap-3">
+          <span class="text-yellow-500 text-xl">&#9888;</span>
+          <p class="text-yellow-400">{syncMessage}</p>
+        </div>
+      {/if}
+
       <!-- Save Button -->
       <div class="flex justify-between items-center">
         <button
           on:click={runSetupWizard}
           class="px-6 py-3 glass hover:bg-nebula-card rounded-lg font-semibold"
         >
-          🚀 Run Setup Wizard
+          Run Setup Wizard
         </button>
         <button
           on:click={saveSettings}
-          class="px-8 py-3 bg-nebula-primary hover:bg-nebula-primaryLight rounded-lg font-semibold text-lg"
+          disabled={syncing}
+          class="px-8 py-3 bg-nebula-primary hover:bg-nebula-primaryLight disabled:opacity-50 rounded-lg font-semibold text-lg"
         >
-          Save Settings
+          {syncing ? 'Syncing...' : 'Save & Sync'}
         </button>
       </div>
 

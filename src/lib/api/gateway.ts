@@ -15,6 +15,25 @@
  * handles 404 responses for future endpoints.
  */
 
+export interface GatewayStatus {
+  status: string;
+  version: string;
+  uptime_seconds: number;
+  provider: {
+    type: string;
+    base_url: string;
+    model: string;
+    has_api_key: boolean;
+  };
+}
+
+export interface ProviderUpdateRequest {
+  type: string;
+  base_url: string;
+  model: string;
+  api_key?: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -44,6 +63,50 @@ export class GatewayAPI {
       headers['Authorization'] = `Bearer ${this.bearerToken}`;
     }
     return headers;
+  }
+
+  async getStatus(): Promise<GatewayStatus | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/status`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async updateProvider(config: ProviderUpdateRequest): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/config/provider`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(config),
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ message: response.statusText }));
+        return { success: false, message: data.message || `HTTP ${response.status}` };
+      }
+      const data = await response.json();
+      return { success: true, message: data.message || 'Provider updated' };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { success: false, message: msg };
+    }
+  }
+
+  async getProviderConfig(): Promise<{ type: string; base_url: string; model: string; has_api_key: boolean } | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/config/provider`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 
   async checkHealth(): Promise<boolean> {
