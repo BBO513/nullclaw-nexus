@@ -1103,6 +1103,32 @@
     fill: #a78bfa !important;
   }
 
+  /* Move zoom controls to bottom-center so they don't overlap canvas nodes */
+  :global(.svelte-flow__controls) {
+    left: 50% !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 4px !important;
+    background: rgba(17, 17, 24, 0.9) !important;
+    border: 1px solid rgba(124, 58, 237, 0.3) !important;
+    border-radius: 8px !important;
+    padding: 4px !important;
+  }
+
+  :global(.svelte-flow__controls button) {
+    background: transparent !important;
+    border: none !important;
+    color: #a78bfa !important;
+    fill: #a78bfa !important;
+  }
+
+  :global(.svelte-flow__controls button:hover) {
+    background: rgba(124, 58, 237, 0.2) !important;
+    border-radius: 4px !important;
+  }
+
   @keyframes slide-up {
     from {
       transform: translateY(100px);
