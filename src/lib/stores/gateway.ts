@@ -1,6 +1,41 @@
 import { writable } from 'svelte/store';
 import { discoverGateway, isTauri } from '$lib/tauri';
 
+export interface GatewayHealthStatus {
+  connected: boolean;
+  latency: number;
+  lastChecked: Date;
+}
+
+export const gatewayStatus = writable<GatewayHealthStatus>({
+  connected: false,
+  latency: 0,
+  lastChecked: new Date()
+});
+
+/**
+ * Check gateway health and update the gatewayStatus store.
+ * Called from OfflineIndicator on a 15-second interval.
+ */
+export async function checkGatewayHealth(url: string): Promise<boolean> {
+  const start = Date.now();
+  try {
+    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      gatewayStatus.set({
+        connected: true,
+        latency: Date.now() - start,
+        lastChecked: new Date()
+      });
+      return true;
+    }
+  } catch {
+    // Gateway unreachable
+  }
+  gatewayStatus.set({ connected: false, latency: 0, lastChecked: new Date() });
+  return false;
+}
+
 export interface GatewayConfig {
   url: string;
   connected: boolean;

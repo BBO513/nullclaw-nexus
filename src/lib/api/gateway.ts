@@ -68,6 +68,7 @@ export class GatewayAPI {
   async getStatus(): Promise<GatewayStatus | null> {
     try {
       const response = await fetch(`${this.baseUrl}/status`, {
+        headers: this.getHeaders(),
         signal: AbortSignal.timeout(5000)
       });
       if (!response.ok) return null;
