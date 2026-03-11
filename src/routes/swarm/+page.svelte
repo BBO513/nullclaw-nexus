@@ -69,6 +69,19 @@
   let toastType: 'success' | 'error' = 'success';
   let showToast = false;
 
+  // Node editor state
+  let editingNode: any = null;
+  let editNodeLabel = '';
+  let editNodeRole = '';
+  let editNodeModel = '';
+  let showNodeEditor = false;
+
+  // Swarm execution state
+  let running = false;
+  let runLog: Array<{ nodeId: string; label: string; status: 'pending' | 'running' | 'done' | 'error'; message?: string }> = [];
+  let showRunPanel = false;
+  let deploying = false;
+
   // Load swarm from localStorage
   function loadFromLocalStorage() {
     if (typeof localStorage === 'undefined') return false;
@@ -340,6 +353,44 @@
     saveToLocalStorage();
   }
 
+  // Handle double-click on node to open editor
+  function handleNodeDoubleClick(event: any) {
+    const node = event.detail?.node || event.detail;
+    if (!node) return;
+    
+    editingNode = node;
+    editNodeLabel = node.data?.label || '';
+    editNodeRole = node.data?.role || 'worker';
+    editNodeModel = node.data?.model || $gatewayConfig.model || 'llama3.1';
+    showNodeEditor = true;
+  }
+
+  // Save node edits
+  function saveNodeEdits() {
+    if (!editingNode) return;
+    
+    nodes = nodes.map(n => 
+      n.id === editingNode.id 
+        ? { ...n, data: { ...n.data, label: editNodeLabel, role: editNodeRole, model: editNodeModel } }
+        : n
+    );
+    
+    showNodeEditor = false;
+    editingNode = null;
+    saveToLocalStorage();
+    showToastMessage('Node updated', 'success');
+  }
+
+  // Delete a specific node by id
+  function deleteNode(nodeId: string) {
+    nodes = nodes.filter(n => n.id !== nodeId);
+    edges = edges.filter(e => e.source !== nodeId && e.target !== nodeId);
+    showNodeEditor = false;
+    editingNode = null;
+    saveToLocalStorage();
+    showToastMessage('Node deleted', 'success');
+  }
+
   // Handle new connection - add edge
   function handleConnect(event: any) {
     const connection = event.detail;
@@ -409,6 +460,149 @@
 
   function exportConfig() {
     showExportModal = true;
+  }
+
+  // Add agent from library with preset role
+  function addFromLibrary(preset: { label: string; role: string; icon: string }) {
+    const newId = `${preset.role}-${Date.now()}`;
+    const typeMap: Record<string, string> = { input: 'input', output: 'output' };
+    const nodeType = typeMap[preset.role] || 'agent';
+    
+    const newNode = {
+      id: newId,
+      type: nodeType,
+      data: { label: `${preset.icon} ${preset.label}`, role: preset.role, model: $gatewayConfig.model || 'llama3.1' },
+      position: { 
+        x: 100 + Math.random() * 500, 
+        y: 100 + Math.random() * 300 
+      },
+    };
+    
+    nodes = [...nodes, newNode];
+    saveToLocalStorage();
+    showToastMessage(`Added ${preset.label}`, 'success');
+  }
+
+  // Run swarm execution - chains messages through connected agents
+  async function runSwarm() {
+    if (running) return;
+    running = true;
+    showRunPanel = true;
+    
+    // Build execution order from edges (topological sort)
+    const inputNodes = nodes.filter(n => n.type === 'input' || n.data?.role === 'input');
+    const outputNodes = nodes.filter(n => n.type === 'output' || n.data?.role === 'output');
+    
+    if (inputNodes.length === 0) {
+      showToastMessage('No input node found. Add an input node to start the swarm.', 'error');
+      running = false;
+      return;
+    }
+    
+    // Initialize run log
+    runLog = nodes.map(n => ({
+      nodeId: n.id,
+      label: n.data?.label || n.id,
+      status: 'pending'
+    }));
+    
+    const gatewayUrl = $gatewayConfig.url || 'http://127.0.0.1:3000';
+    const model = $gatewayConfig.model || 'llama3.1';
+    let currentMessage = 'Hello, I need help with a task.';
+    
+    // Walk the graph: input -> agents -> output
+    const visited = new Set<string>();
+    const queue = inputNodes.map(n => n.id);
+    
+    while (queue.length > 0) {
+      const nodeId = queue.shift();
+      if (!nodeId || visited.has(nodeId)) continue;
+      visited.add(nodeId);
+      
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) continue;
+      
+      // Update status to running
+      runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'running' } : r);
+      
+      try {
+        // Send message through gateway for agent nodes
+        if (node.type === 'agent' || node.data?.role === 'coordinator' || node.data?.role === 'worker' || node.data?.role === 'planner' || node.data?.role === 'researcher') {
+          const systemPrompt = `You are ${node.data?.label || 'an AI agent'} with role: ${node.data?.role || 'worker'}. Process the input and respond concisely.`;
+          
+          const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: node.data?.model || model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: currentMessage }
+              ]
+            }),
+            signal: AbortSignal.timeout(30000)
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const reply = data.choices?.[0]?.message?.content || data.choices?.[0]?.delta?.content || 'No response';
+            currentMessage = reply;
+            runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'done', message: reply.substring(0, 100) } : r);
+          } else {
+            runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'error', message: `HTTP ${response.status}` } : r);
+          }
+        } else {
+          // Input/output nodes just pass through
+          runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'done', message: node.type === 'input' ? 'Input received' : `Output: ${currentMessage.substring(0, 80)}` } : r);
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'error', message: msg } : r);
+      }
+      
+      // Queue downstream nodes
+      const downstream = edges.filter(e => e.source === nodeId).map(e => e.target);
+      for (const next of downstream) {
+        if (!visited.has(next)) queue.push(next);
+      }
+    }
+    
+    running = false;
+    showToastMessage('Swarm execution complete', 'success');
+  }
+
+  // Deploy swarm config to gateway
+  async function deployToGateway() {
+    deploying = true;
+    const config = generateConfig();
+    
+    try {
+      const api = new GatewayAPI($gatewayConfig.url, $gatewayConfig.bearerToken);
+      const result = await api.applySwarmConfig(config);
+      
+      if (result.success) {
+        showToastMessage('Swarm config deployed to gateway', 'success');
+      } else {
+        // Gateway doesn't support /config/swarm yet — auto-download instead
+        showToastMessage('Gateway endpoint not available yet. Downloading config file...', 'error');
+        // Auto-trigger download as fallback
+        const content = JSON.stringify(config, null, 2);
+        const blob = new Blob([content], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'nullclaw-swarm-config.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      showToastMessage(`Deploy failed: ${msg}`, 'error');
+    } finally {
+      deploying = false;
+    }
   }
 
   function downloadConfig() {
@@ -543,6 +737,20 @@
             🗑️ Clear
           </button>
           <button 
+            on:click={runSwarm}
+            disabled={running}
+            class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-lg font-semibold transition-all"
+          >
+            {running ? '⏳ Running...' : '▶ Run Swarm'}
+          </button>
+          <button 
+            on:click={deployToGateway}
+            disabled={deploying}
+            class="px-4 py-2 glass hover:bg-nebula-accent/20 rounded-lg border border-nebula-accent/30 hover:border-nebula-accent/60 transition-all"
+          >
+            {deploying ? '⏳ Deploying...' : '🚀 Deploy'}
+          </button>
+          <button 
             on:click={exportConfig}
             class="px-4 py-2 glass hover:bg-nebula-card rounded-lg border border-nebula-primary/30 hover:border-nebula-primary/60 transition-all"
           >
@@ -601,6 +809,7 @@
               on:connect={handleConnect}
               on:nodesdelete={handleNodesDelete}
               on:edgesdelete={handleEdgesDelete}
+              on:nodedoubleclick={handleNodeDoubleClick}
             >
               <Background />
               <Controls />
@@ -642,22 +851,149 @@
     <!-- Sidebar -->
     <div class="absolute right-4 top-24 w-64 glass p-4 rounded-xl">
       <h3 class="font-bold mb-4">Agent Library</h3>
+      <p class="text-xs text-gray-400 mb-3">Click to add to canvas</p>
       <div class="space-y-2">
-        <div class="p-3 bg-nebula-primary/10 rounded-lg cursor-move hover:bg-nebula-primary/20">
+        <button
+          on:click={() => addFromLibrary({ label: 'Worker Agent', role: 'worker', icon: '🤖' })}
+          class="w-full text-left p-3 bg-nebula-primary/10 rounded-lg cursor-pointer hover:bg-nebula-primary/20 transition-all"
+        >
           <div class="font-semibold">🤖 Worker Agent</div>
           <div class="text-xs text-gray-400">Execute tasks</div>
-        </div>
-        <div class="p-3 bg-nebula-accent/10 rounded-lg cursor-move hover:bg-nebula-accent/20">
+        </button>
+        <button
+          on:click={() => addFromLibrary({ label: 'Planner Agent', role: 'planner', icon: '🧠' })}
+          class="w-full text-left p-3 bg-nebula-accent/10 rounded-lg cursor-pointer hover:bg-nebula-accent/20 transition-all"
+        >
           <div class="font-semibold">🧠 Planner Agent</div>
           <div class="text-xs text-gray-400">Strategy & planning</div>
-        </div>
-        <div class="p-3 bg-nebula-secondary/10 rounded-lg cursor-move hover:bg-nebula-secondary/20">
+        </button>
+        <button
+          on:click={() => addFromLibrary({ label: 'Researcher Agent', role: 'researcher', icon: '🔍' })}
+          class="w-full text-left p-3 bg-nebula-secondary/10 rounded-lg cursor-pointer hover:bg-nebula-secondary/20 transition-all"
+        >
           <div class="font-semibold">🔍 Researcher Agent</div>
           <div class="text-xs text-gray-400">Gather information</div>
+        </button>
+        <button
+          on:click={() => addFromLibrary({ label: 'Coder Agent', role: 'coder', icon: '💻' })}
+          class="w-full text-left p-3 bg-blue-500/10 rounded-lg cursor-pointer hover:bg-blue-500/20 transition-all"
+        >
+          <div class="font-semibold">💻 Coder Agent</div>
+          <div class="text-xs text-gray-400">Write & review code</div>
+        </button>
+        <button
+          on:click={() => addFromLibrary({ label: 'Critic Agent', role: 'critic', icon: '🔬' })}
+          class="w-full text-left p-3 bg-yellow-500/10 rounded-lg cursor-pointer hover:bg-yellow-500/20 transition-all"
+        >
+          <div class="font-semibold">🔬 Critic Agent</div>
+          <div class="text-xs text-gray-400">Evaluate & improve output</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Run Panel (execution log) -->
+    {#if showRunPanel && runLog.length > 0}
+      <div class="absolute left-4 top-24 w-72 glass p-4 rounded-xl max-h-[60vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold">Execution Log</h3>
+          <button on:click={() => showRunPanel = false} class="text-gray-400 hover:text-white">&times;</button>
+        </div>
+        <div class="space-y-2">
+          {#each runLog as entry}
+            <div class={`p-2 rounded-lg border text-sm ${
+              entry.status === 'running' ? 'border-yellow-500/50 bg-yellow-500/10' :
+              entry.status === 'done' ? 'border-green-500/50 bg-green-500/10' :
+              entry.status === 'error' ? 'border-red-500/50 bg-red-500/10' :
+              'border-gray-700 bg-gray-800/50'
+            }`}>
+              <div class="flex items-center gap-2">
+                <span class="text-xs">
+                  {entry.status === 'running' ? '⏳' : entry.status === 'done' ? '✅' : entry.status === 'error' ? '❌' : '⏸️'}
+                </span>
+                <span class="font-semibold text-xs">{entry.label}</span>
+              </div>
+              {#if entry.message}
+                <p class="text-xs text-gray-400 mt-1 line-clamp-2">{entry.message}</p>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  </div>
+
+  <!-- Node Editor Modal -->
+  {#if showNodeEditor && editingNode}
+    <div class="fixed inset-0 bg-black/80 flex items-center justify-center p-8 z-50">
+      <div class="glass max-w-md w-full p-6 rounded-xl">
+        <h2 class="text-xl font-bold mb-4">Edit Node</h2>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Label</label>
+            <input
+              type="text"
+              bind:value={editNodeLabel}
+              class="w-full glass px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
+              placeholder="Node label"
+            />
+          </div>
+          
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Role</label>
+            <select
+              bind:value={editNodeRole}
+              class="w-full glass px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary bg-nebula-bg"
+            >
+              <option value="input">Input</option>
+              <option value="output">Output</option>
+              <option value="coordinator">Coordinator</option>
+              <option value="worker">Worker</option>
+              <option value="planner">Planner</option>
+              <option value="researcher">Researcher</option>
+              <option value="coder">Coder</option>
+              <option value="critic">Critic</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">Model</label>
+            <input
+              type="text"
+              bind:value={editNodeModel}
+              class="w-full glass px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
+              placeholder="e.g. llama3.1, claude-sonnet-4, gpt-4o"
+            />
+          </div>
+          
+          <div class="text-xs text-gray-500">
+            Node ID: {editingNode.id} &middot; Type: {editingNode.type}
+          </div>
+        </div>
+        
+        <div class="flex gap-3 mt-6">
+          <button
+            on:click={() => { showNodeEditor = false; editingNode = null; }}
+            class="flex-1 px-4 py-3 glass hover:bg-nebula-card rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            on:click={() => deleteNode(editingNode.id)}
+            class="px-4 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-semibold"
+          >
+            Delete
+          </button>
+          <button
+            on:click={saveNodeEdits}
+            class="flex-1 px-4 py-3 bg-nebula-primary hover:bg-nebula-primaryLight rounded-lg font-semibold"
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>
-  </div>
+  {/if}
 
   <!-- Export Modal -->
   {#if showExportModal}

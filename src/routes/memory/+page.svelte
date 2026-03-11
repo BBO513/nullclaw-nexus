@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { memories, type Memory } from '$lib/stores/memories';
+  import { memories, type Memory, toggleMemoryActive, setAllMemoriesActive } from '$lib/stores/memories';
   import { gatewayConfig } from '$lib/stores/gateway';
   import { license } from '$lib/stores/license';
   import { GatewayAPI } from '$lib/api/gateway';
@@ -41,6 +41,7 @@
           type: file.name.includes('prompt') ? 'prompt' : 'knowledge',
           size: file.size,
           createdAt: new Date(),
+          active: false,
         };
         memories.update(m => [...m, newMemory]);
         showToastMessage(`✅ Uploaded "${file.name}"`, 'success');
@@ -148,6 +149,28 @@
         {#if !$license.valid}
           <p class="text-sm text-yellow-500 mt-2">Free tier: {$memories.length}/5 memories used</p>
         {/if}
+        
+        <!-- Active memories summary -->
+        {@const activeCount = $memories.filter(m => m.active).length}
+        {#if $memories.length > 0}
+          <div class="flex items-center gap-4 mt-4">
+            <span class="text-sm text-nebula-accent">
+              {activeCount}/{$memories.length} memories active in chat context
+            </span>
+            <button
+              on:click={() => setAllMemoriesActive(true)}
+              class="text-xs px-3 py-1 bg-nebula-accent/20 hover:bg-nebula-accent/30 rounded transition-all"
+            >
+              Activate All
+            </button>
+            <button
+              on:click={() => setAllMemoriesActive(false)}
+              class="text-xs px-3 py-1 bg-gray-500/20 hover:bg-gray-500/30 rounded transition-all"
+            >
+              Deactivate All
+            </button>
+          </div>
+        {/if}
       </header>
 
       <!-- Upload Zone -->
@@ -167,7 +190,7 @@
       <!-- Memory List -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {#each $memories as memory}
-          <div class="glass p-6">
+          <div class={`glass p-6 border-2 transition-all ${memory.active ? 'border-nebula-accent/50 shadow-lg shadow-nebula-accent/10' : 'border-transparent'}`}>
             <div class="flex items-start justify-between mb-4">
               <div class="flex-1">
                 <h3 class="font-bold text-lg truncate">{memory.name}</h3>
@@ -176,8 +199,19 @@
                     {memory.type}
                   </span>
                   <span class="text-xs text-gray-400">{(memory.size / 1024).toFixed(1)} KB</span>
+                  {#if memory.active}
+                    <span class="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400">Active</span>
+                  {/if}
                 </div>
               </div>
+              <!-- Active toggle -->
+              <button
+                on:click={() => toggleMemoryActive(memory.id)}
+                class={`w-12 h-6 rounded-full transition-all relative ${memory.active ? 'bg-nebula-accent' : 'bg-gray-600'}`}
+                title={memory.active ? 'Deactivate from chat context' : 'Activate in chat context'}
+              >
+                <div class={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all ${memory.active ? 'left-6' : 'left-0.5'}`}></div>
+              </button>
             </div>
 
             <div class="text-sm text-gray-400 mb-4 line-clamp-3">
@@ -196,7 +230,7 @@
                 disabled={injecting || !$gatewayConfig.connected}
                 class="flex-1 px-3 py-2 bg-nebula-accent/20 hover:bg-nebula-accent/30 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm"
               >
-                {injecting ? 'Injecting...' : 'Inject'}
+                {injecting ? 'Injecting...' : 'Inject to Gateway'}
               </button>
               <button
                 on:click={() => deleteMemory(memory.id)}
