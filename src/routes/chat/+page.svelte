@@ -165,7 +165,7 @@
         try {
             // Build messages with active memory context
             const memoryMessages = getActiveMemoryMessages($memories);
-            const chatHistory = messages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+            const chatHistory = messages.slice(0, -2).map(m => ({ role: m.role, content: m.content }));
           
             const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
               method: 'POST',
