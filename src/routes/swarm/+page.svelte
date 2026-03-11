@@ -445,7 +445,7 @@
         connections: edges.map(edge => ({
           from: edge.source,
           to: edge.target,
-          type: 'smoothstep'
+          type: 'delegate'
         }))
       },
       gateway: {
