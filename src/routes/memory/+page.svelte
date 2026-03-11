@@ -70,7 +70,7 @@
     const memoryId = selectedMemory.id;
     memories.update(m => m.map(mem => 
       mem.id === memoryId 
-        ? { ...mem, content: editContent }
+        ? { ...mem, content: editContent, size: new Blob([editContent]).size }
         : mem
     ));
     selectedMemory = null;
