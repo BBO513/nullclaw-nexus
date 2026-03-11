@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { gatewayConfig } from '$lib/stores/gateway';
+  import { memories, type Memory, getActiveMemoryMessages, toggleMemoryActive } from '$lib/stores/memories';
 
   let mounted = $state(false);
   let messages: Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }> = $state([]);
@@ -12,6 +13,7 @@
   let chatMode: 'async' | 'direct' = $state('direct'); // 'async' for gateway webhook, 'direct' for Ollama
   let streaming = $state(false);
   let currentStreamAssistantMessage: { role: 'assistant'; content: string; timestamp: Date } | null = $state(null);
+  let showMemoryPanel = $state(false);
 
   onMount(async () => {
     mounted = true;
@@ -161,21 +163,25 @@
         messages = [...messages, currentStreamAssistantMessage];
         
         try {
-          // Route through NullClaw gateway — it handles provider routing
-          const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                ...messages.slice(0, -1).map(m => ({ role: m.role, content: m.content })),
-                { role: 'user', content: userMessage }
-              ],
-              stream: true
-            })
-          });
+            // Build messages with active memory context
+            const memoryMessages = getActiveMemoryMessages($memories);
+            const chatHistory = messages.slice(0, -2).map(m => ({ role: m.role, content: m.content }));
+          
+            const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  ...memoryMessages,
+                  ...chatHistory,
+                  { role: 'user', content: userMessage }
+                ],
+                stream: true
+              })
+            });
 
           if (!response.ok) {
             if (response.status === 0 || response.status === 404) {
@@ -576,6 +582,45 @@
       </div>
     </div>
 
+    <!-- Memory Context Panel (collapsible sidebar) -->
+    {#if showMemoryPanel}
+      <div class="absolute right-0 top-0 bottom-0 w-80 glass border-l border-nebula-primary/20 z-40 flex flex-col">
+        <div class="p-4 border-b border-nebula-primary/20 flex items-center justify-between">
+          <h3 class="font-bold">Memory Context</h3>
+          <button on:click={() => showMemoryPanel = false} class="text-gray-400 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+          {#if $memories.length === 0}
+            <p class="text-gray-500 text-sm text-center py-8">No memories yet. Go to <a href="/memory" class="text-nebula-accent hover:underline">Memory Vault</a> to add some.</p>
+          {:else}
+            <p class="text-xs text-gray-400 mb-2">{$memories.filter(m => m.active).length} active — included as system messages</p>
+            {#each $memories as memory}
+              <div class={`p-3 rounded-lg border transition-all cursor-pointer ${memory.active ? 'border-nebula-accent/50 bg-nebula-accent/10' : 'border-gray-700 bg-gray-800/50'}`}>
+                <div class="flex items-center justify-between">
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-sm truncate">{memory.name}</div>
+                    <div class="text-xs text-gray-400">{memory.type} &middot; {(memory.size / 1024).toFixed(1)} KB</div>
+                  </div>
+                  <button
+                    on:click={() => toggleMemoryActive(memory.id)}
+                    class={`w-10 h-5 rounded-full transition-all relative flex-shrink-0 ml-2 ${memory.active ? 'bg-nebula-accent' : 'bg-gray-600'}`}
+                  >
+                    <div class={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all ${memory.active ? 'left-5' : 'left-0.5'}`}></div>
+                  </button>
+                </div>
+                {#if memory.active}
+                  <div class="text-xs text-gray-400 mt-2 line-clamp-2">{memory.content.substring(0, 100)}...</div>
+                {/if}
+              </div>
+            {/each}
+          {/if}
+        </div>
+        <div class="p-3 border-t border-nebula-primary/20">
+          <a href="/memory" class="block text-center text-sm text-nebula-accent hover:text-nebula-primary transition-all">Manage Memories</a>
+        </div>
+      </div>
+    {/if}
+
     <!-- Input -->
     <div class="glass border-t border-nebula-primary/20 p-4">
       <div class="max-w-4xl mx-auto flex gap-4">
@@ -587,13 +632,22 @@
           class="flex-1 glass px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary resize-none"
           rows="2"
         ></textarea>
-        <button
-          on:click={sendMessage}
-          disabled={sending || polling || streaming || !inputMessage.trim()}
-          class="px-8 py-3 bg-nebula-primary hover:bg-nebula-primaryLight disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold"
-        >
-          {sending ? 'Sending...' : polling ? 'Waiting...' : streaming ? 'Streaming...' : 'Send'}
-        </button>
+        <div class="flex flex-col gap-2">
+          <button
+            on:click={sendMessage}
+            disabled={sending || polling || streaming || !inputMessage.trim()}
+            class="px-8 py-3 bg-nebula-primary hover:bg-nebula-primaryLight disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold"
+          >
+            {sending ? 'Sending...' : polling ? 'Waiting...' : streaming ? 'Streaming...' : 'Send'}
+          </button>
+          <button
+            on:click={() => showMemoryPanel = !showMemoryPanel}
+            class={`px-4 py-1 text-xs rounded-lg transition-all ${$memories.filter(m => m.active).length > 0 ? 'bg-nebula-accent/20 text-nebula-accent border border-nebula-accent/30' : 'glass text-gray-400'}`}
+            title="Toggle memory context panel"
+          >
+            {$memories.filter(m => m.active).length > 0 ? `${$memories.filter(m => m.active).length} memories` : 'Memories'}
+          </button>
+        </div>
       </div>
     </div>
   </div>
