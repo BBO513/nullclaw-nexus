@@ -111,7 +111,8 @@
         sessions: 0,
         avgTokensPerMessage: 0
       };
-      loadAnalytics();
+      // Don't call loadAnalytics() here — it would re-derive stats from
+      // chat_messages and immediately repopulate the values we just zeroed.
     }
   }
 
