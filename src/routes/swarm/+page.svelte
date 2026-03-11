@@ -527,7 +527,7 @@
       
       try {
         // Send message through gateway for agent nodes
-        if (node.type === 'agent' || node.data?.role === 'coordinator' || node.data?.role === 'worker' || node.data?.role === 'planner' || node.data?.role === 'researcher') {
+        if (node.type === 'agent' || node.data?.role === 'coordinator' || node.data?.role === 'worker' || node.data?.role === 'planner' || node.data?.role === 'researcher' || node.data?.role === 'coder' || node.data?.role === 'critic') {
           const systemPrompt = `You are ${node.data?.label || 'an AI agent'} with role: ${node.data?.role || 'worker'}. Process the input and respond concisely.`;
           
           const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
