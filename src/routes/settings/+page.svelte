@@ -1,7 +1,7 @@
 <svelte:options runes={false} />
 
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { gatewayConfig, providers, ollamaModels, openaiModels, claudeModels } from '$lib/stores/gateway';
   import { currentTheme, proUnlocked } from '$lib/stores/theme';
   import { license, deactivateLicense } from '$lib/stores/license';
@@ -27,6 +27,7 @@
   let syncing = false;
   let syncStatus: 'idle' | 'success' | 'error' = 'idle';
   let syncMessage = '';
+  let syncTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
     mounted = true;
@@ -189,7 +190,8 @@
     syncing = false;
 
     // Clear sync status after 4 seconds
-    setTimeout(() => { syncStatus = 'idle'; }, 4000);
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => { syncStatus = 'idle'; }, 4000);
   }
 
   async function checkOllama() {
@@ -211,6 +213,10 @@
       ollamaDetected = false;
     }
   }
+
+  onDestroy(() => {
+    if (syncTimeout) clearTimeout(syncTimeout);
+  });
 
   function unlockPro() {
     showLicenseModal = true;
@@ -427,7 +433,7 @@
                 class="w-full glass px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
               />
               <p class="text-xs text-gray-500 mt-1">
-                Your API key is stored locally and never sent to our servers
+                Your API key is stored locally and sent to your gateway on sync
               </p>
             </div>
           {/if}

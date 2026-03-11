@@ -100,6 +100,7 @@ export class GatewayAPI {
   async getProviderConfig(): Promise<{ type: string; base_url: string; model: string; has_api_key: boolean } | null> {
     try {
       const response = await fetch(`${this.baseUrl}/config/provider`, {
+        headers: this.getHeaders(),
         signal: AbortSignal.timeout(5000)
       });
       if (!response.ok) return null;
