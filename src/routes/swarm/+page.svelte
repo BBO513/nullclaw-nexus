@@ -506,19 +506,46 @@
     
     const gatewayUrl = $gatewayConfig.url || 'http://127.0.0.1:3000';
     const model = $gatewayConfig.model || 'llama3.1';
-    let currentMessage = 'Hello, I need help with a task.';
+    const initialMessage = 'Hello, I need help with a task.';
     
-    // Walk the graph: input -> agents -> output
-    const visited = new Set<string>();
-    const queue = inputNodes.map(n => n.id);
+    // Per-node output tracking so branching/convergent graphs get correct inputs
+    const nodeOutputs = new Map<string, string>();
+    
+    // Kahn's algorithm: compute in-degrees and process nodes in topological order
+    const inDegree = new Map<string, number>();
+    for (const n of nodes) {
+      inDegree.set(n.id, 0);
+    }
+    for (const e of edges) {
+      inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
+    }
+    
+    // Initialize queue with nodes that have in-degree 0 (no parents)
+    const queue: string[] = [];
+    for (const n of nodes) {
+      if ((inDegree.get(n.id) || 0) === 0) {
+        queue.push(n.id);
+      }
+    }
     
     while (queue.length > 0) {
       const nodeId = queue.shift();
-      if (!nodeId || visited.has(nodeId)) continue;
-      visited.add(nodeId);
+      if (!nodeId) continue;
       
       const node = nodes.find(n => n.id === nodeId);
       if (!node) continue;
+      
+      // Determine input: combine outputs from all parent nodes, or use initial message
+      const parentEdges = edges.filter(e => e.target === nodeId);
+      let nodeInput: string;
+      if (parentEdges.length === 0) {
+        nodeInput = initialMessage;
+      } else {
+        const parentOutputs = parentEdges
+          .map(e => nodeOutputs.get(e.source))
+          .filter((o): o is string => o !== undefined);
+        nodeInput = parentOutputs.length > 0 ? parentOutputs.join('\n\n') : initialMessage;
+      }
       
       // Update status to running
       runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'running' } : r);
@@ -535,7 +562,7 @@
               model: node.data?.model || model,
               messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: currentMessage }
+                { role: 'user', content: nodeInput }
               ]
             }),
             signal: AbortSignal.timeout(30000)
@@ -544,24 +571,31 @@
           if (response.ok) {
             const data = await response.json();
             const reply = data.choices?.[0]?.message?.content || data.choices?.[0]?.delta?.content || 'No response';
-            currentMessage = reply;
+            nodeOutputs.set(nodeId, reply);
             runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'done', message: reply.substring(0, 100) } : r);
           } else {
+            nodeOutputs.set(nodeId, nodeInput);
             runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'error', message: `HTTP ${response.status}` } : r);
           }
         } else {
           // Input/output nodes just pass through
-          runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'done', message: node.type === 'input' ? 'Input received' : `Output: ${currentMessage.substring(0, 80)}` } : r);
+          nodeOutputs.set(nodeId, nodeInput);
+          runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'done', message: node.type === 'input' ? 'Input received' : `Output: ${nodeInput.substring(0, 80)}` } : r);
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
+        nodeOutputs.set(nodeId, nodeInput);
         runLog = runLog.map(r => r.nodeId === nodeId ? { ...r, status: 'error', message: msg } : r);
       }
       
-      // Queue downstream nodes
+      // Decrement in-degree of downstream nodes; enqueue when all parents are done
       const downstream = edges.filter(e => e.source === nodeId).map(e => e.target);
       for (const next of downstream) {
-        if (!visited.has(next)) queue.push(next);
+        const newDegree = (inDegree.get(next) || 1) - 1;
+        inDegree.set(next, newDegree);
+        if (newDegree === 0) {
+          queue.push(next);
+        }
       }
     }
     
