@@ -54,8 +54,8 @@
   ];
 
   const DEFAULT_MOCK_EDGES = [
-    { id: 'e1', source: 'input', target: 'agent', label: 'delegate', type: 'smoothstep' },
-    { id: 'e2', source: 'agent', target: 'output', label: 'feedback', type: 'smoothstep' },
+    { id: 'e1', source: 'input', target: 'agent', type: 'smoothstep' },
+    { id: 'e2', source: 'agent', target: 'output', type: 'smoothstep' },
   ];
   
   // Swarm data - will be loaded from localStorage or gateway
@@ -166,7 +166,6 @@
               id: conn.id || `e-${idx}`,
               source: conn.from || conn.source,
               target: conn.to || conn.target,
-              label: conn.type || conn.label || 'delegate',
               type: 'smoothstep'
             }));
           }
@@ -400,7 +399,6 @@
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source,
       target: connection.target,
-      label: 'delegate',
       type: 'smoothstep'
     };
     
@@ -447,7 +445,7 @@
         connections: edges.map(edge => ({
           from: edge.source,
           to: edge.target,
-          type: edge.label || 'delegate'
+          type: 'smoothstep'
         }))
       },
       gateway: {
@@ -790,13 +788,6 @@
               nodesConnectable: true,
               elementsSelectable: true
             }}
-            {console.log('🎨 Rendering SvelteFlow with:', { 
-              nodesCount: nodes.length, 
-              edgesCount: edges.length,
-              nodes,
-              edges,
-              SvelteFlow: !!SvelteFlow 
-            })}
             <SvelteFlow 
               {nodes}
               {edges}
