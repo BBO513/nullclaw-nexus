@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { gatewayConfig, gatewayStatus, checkGatewayHealth } from '$lib/stores/gateway';
+  import { gatewayConfig, checkGatewayHealth } from '$lib/stores/gateway';
 
   let isOnline = true;
   let gatewayOnline = false;
   let checking = false;
   let dismissed = false;
-  let latencyMs = 0;
+  let dismissTimeout: ReturnType<typeof setTimeout> | null = null;
   let statusText = '';
   let statusColor = '';
 
@@ -21,7 +21,6 @@
     updateStatus();
 
     gatewayOnline = await checkGatewayHealth($gatewayConfig.url);
-    latencyMs = $gatewayStatus.latency;
     checking = false;
     updateStatus();
 
@@ -47,7 +46,8 @@
   function dismiss() {
     dismissed = true;
     // Re-show after 60 seconds if still offline
-    setTimeout(() => { dismissed = false; }, 60000);
+    if (dismissTimeout) clearTimeout(dismissTimeout);
+    dismissTimeout = setTimeout(() => { dismissed = false; }, 60000);
   }
 
   onMount(() => {
@@ -80,6 +80,7 @@
 
     return () => {
       clearInterval(interval);
+      if (dismissTimeout) clearTimeout(dismissTimeout);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };

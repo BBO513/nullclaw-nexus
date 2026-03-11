@@ -7,6 +7,8 @@
 
   interface AnalyticsStats {
     totalMessages: number;
+    userMessages: number;
+    assistantMessages: number;
     totalTokens: number;
     topModel: string;
     sessions: number;
@@ -15,6 +17,8 @@
 
   let stats: AnalyticsStats = {
     totalMessages: 0,
+    userMessages: 0,
+    assistantMessages: 0,
     totalTokens: 0,
     topModel: 'None',
     sessions: 0,
@@ -45,6 +49,8 @@
       try {
         const messages = JSON.parse(chatMessages);
         stats.totalMessages = messages.length;
+        stats.userMessages = messages.filter((m: { role: string }) => m.role === 'user').length;
+        stats.assistantMessages = messages.filter((m: { role: string }) => m.role === 'assistant').length;
         // Estimate tokens (~4 chars per token)
         stats.totalTokens = messages.reduce((acc: number, m: { content: string }) => {
           return acc + Math.ceil((m.content || '').length / 4);
@@ -106,6 +112,8 @@
       localStorage.removeItem('nullclaw_analytics');
       stats = {
         totalMessages: 0,
+        userMessages: 0,
+        assistantMessages: 0,
         totalTokens: 0,
         topModel: 'None',
         sessions: 0,
@@ -216,11 +224,11 @@
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400">User Messages</span>
-            <span class="font-mono">{Math.ceil(stats.totalMessages / 2)}</span>
+            <span class="font-mono">{stats.userMessages}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400">Assistant Replies</span>
-            <span class="font-mono">{Math.floor(stats.totalMessages / 2)}</span>
+            <span class="font-mono">{stats.assistantMessages}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400">Data Source</span>
