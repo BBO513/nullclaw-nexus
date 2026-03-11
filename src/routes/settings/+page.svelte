@@ -85,7 +85,8 @@
     }
     // Preserve gateway-synced models that aren't in the hardcoded list
     if (selectedModel && modelList.length > 0 && !modelList.includes(selectedModel)) {
-      modelList = [...modelList, selectedModel];
+      // Model doesn't belong to this provider — reset to first available
+      selectedModel = modelList[0];
     }
     // Auto-select first model only if no model is selected
     if (modelList.length > 0 && !selectedModel) {

@@ -11,6 +11,7 @@
 
   let connected = false;
   let checking = true;
+  let fetching = false;
   let showPairing = false;
   let showLicenseModal = false;
 
@@ -35,18 +36,24 @@
   }
 
   async function fetchStatus() {
-    const api = new GatewayAPI($gatewayConfig.url, $gatewayConfig.bearerToken);
-    const status = await api.getStatus();
-    if (status) {
-      gatewayStatus = status;
-      connected = true;
-      gatewayConfig.update(c => ({ ...c, connected: true }));
-    } else {
-      // Fall back to health check
-      gatewayStatus = null;
-      const healthy = await api.checkHealth();
-      connected = healthy;
-      gatewayConfig.update(c => ({ ...c, connected: healthy }));
+    if (fetching) return;
+    fetching = true;
+    try {
+      const api = new GatewayAPI($gatewayConfig.url, $gatewayConfig.bearerToken);
+      const status = await api.getStatus();
+      if (status) {
+        gatewayStatus = status;
+        connected = true;
+        gatewayConfig.update(c => ({ ...c, connected: true }));
+      } else {
+        // Fall back to health check
+        gatewayStatus = null;
+        const healthy = await api.checkHealth();
+        connected = healthy;
+        gatewayConfig.update(c => ({ ...c, connected: healthy }));
+      }
+    } finally {
+      fetching = false;
     }
   }
 
