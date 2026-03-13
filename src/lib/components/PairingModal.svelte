@@ -8,30 +8,39 @@
   export let onClose: () => void = () => {};
   
   let pairingCode = '';
+  let masterKeyInput = '';
   let pairing = false;
   let error = '';
-  let useMasterKey = false;
+  let pairingMode: 'choose' | 'masterkey' | 'code' = 'choose';
 
   async function handleMasterKeyPair() {
+    if (!masterKeyInput.trim()) {
+      error = 'Please enter your master key';
+      return;
+    }
+
     pairing = true;
     error = '';
 
     try {
-      const api = new GatewayAPI($gatewayConfig.url);
-      const result = await api.pairWithMasterKey('NULLCLAW-CREATOR-UNLIMITED');
+      // Verify the master key by calling /status with it as Bearer token
+      const api = new GatewayAPI($gatewayConfig.url, masterKeyInput.trim());
+      const status = await api.getStatus();
 
-      if (result && result.token) {
+      if (status) {
+        // Master key is valid — store it as bearer token
         gatewayConfig.update(c => ({
           ...c,
-          bearerToken: result.token,
+          bearerToken: masterKeyInput.trim(),
           paired: true,
           connected: true
         }));
         
+        masterKeyInput = '';
         show = false;
-        alert('✅ Successfully paired with master key!');
+        alert('Paired successfully! Your master key is now stored.');
       } else {
-        error = 'Master key pairing failed. Please check that the CORS proxy is running.';
+        error = 'Invalid master key. Make sure it matches the NULLCLAW_MASTER_KEY used to start the gateway.';
       }
     } catch (err) {
       error = 'Failed to connect to gateway. Please check that NullClaw is running.';
@@ -77,8 +86,9 @@
   function handleClose() {
     show = false;
     pairingCode = '';
+    masterKeyInput = '';
     error = '';
-    useMasterKey = false;
+    pairingMode = 'choose';
   }
 </script>
 
@@ -87,26 +97,25 @@
     <div class="glass max-w-md w-full p-8">
       <h2 class="text-2xl font-bold mb-4">Pair with Gateway</h2>
       
-      {#if !useMasterKey}
+      {#if pairingMode === 'choose'}
         <p class="text-gray-400 mb-6">
           Choose your pairing method:
         </p>
 
         <div class="space-y-4 mb-6">
           <button
-            on:click={handleMasterKeyPair}
-            disabled={pairing}
-            class="w-full px-6 py-4 bg-nebula-primary hover:bg-nebula-primaryLight disabled:opacity-50 rounded-lg font-semibold text-left flex items-center gap-3"
+            on:click={() => { pairingMode = 'masterkey'; error = ''; }}
+            class="w-full px-6 py-4 bg-nebula-primary hover:bg-nebula-primaryLight rounded-lg font-semibold text-left flex items-center gap-3"
           >
             <span class="text-2xl">🔑</span>
             <div>
-              <div class="font-bold">Zero-Config Pairing</div>
-              <div class="text-sm opacity-80">Use master key (recommended)</div>
+              <div class="font-bold">Master Key Pairing</div>
+              <div class="text-sm opacity-80">Enter your NULLCLAW_MASTER_KEY (recommended)</div>
             </div>
           </button>
 
           <button
-            on:click={() => useMasterKey = false}
+            on:click={() => { pairingMode = 'code'; error = ''; }}
             class="w-full px-6 py-4 glass hover:bg-nebula-card rounded-lg font-semibold text-left flex items-center gap-3"
           >
             <span class="text-2xl">🔢</span>
@@ -119,12 +128,47 @@
 
         <button
           on:click={handleClose}
-          disabled={pairing}
-          class="w-full px-6 py-3 glass hover:bg-nebula-card disabled:opacity-50 rounded-lg font-semibold"
+          class="w-full px-6 py-3 glass hover:bg-nebula-card rounded-lg font-semibold"
         >
           Cancel
         </button>
-      {:else}
+
+      {:else if pairingMode === 'masterkey'}
+        <p class="text-gray-400 mb-6">
+          Enter the NULLCLAW_MASTER_KEY you used when starting the gateway.
+        </p>
+
+        <div class="mb-6">
+          <label for="master-key-input" class="block text-sm text-gray-400 mb-2">Master Key</label>
+          <input
+            id="master-key-input"
+            type="password"
+            bind:value={masterKeyInput}
+            placeholder="The NULLCLAW_MASTER_KEY from your gateway"
+            disabled={pairing}
+            class="w-full glass px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-nebula-primary"
+          />
+          <p class="text-xs text-gray-500 mt-1">This is the env var you set when running: NULLCLAW_MASTER_KEY=yourkey nullclaw serve</p>
+        </div>
+
+        <div class="flex gap-4">
+          <button
+            on:click={() => { pairingMode = 'choose'; masterKeyInput = ''; error = ''; }}
+            disabled={pairing}
+            class="flex-1 px-6 py-3 glass hover:bg-nebula-card disabled:opacity-50 rounded-lg font-semibold"
+          >
+            Back
+          </button>
+          <button
+            on:click={handleMasterKeyPair}
+            disabled={pairing || !masterKeyInput.trim()}
+            class="flex-1 px-6 py-3 bg-nebula-primary hover:bg-nebula-primaryLight disabled:opacity-50 rounded-lg font-semibold"
+          >
+            {pairing ? 'Verifying...' : 'Pair'}
+          </button>
+        </div>
+
+      {:else if pairingMode === 'code'}
         <p class="text-gray-400 mb-6">
           Enter the 6-digit pairing code from your NullClaw gateway terminal.
         </p>
@@ -153,7 +197,7 @@
 
         <div class="flex gap-4">
           <button
-            on:click={() => { useMasterKey = false; pairingCode = ''; error = ''; }}
+            on:click={() => { pairingMode = 'choose'; pairingCode = ''; error = ''; }}
             disabled={pairing}
             class="flex-1 px-6 py-3 glass hover:bg-nebula-card disabled:opacity-50 rounded-lg font-semibold"
           >
