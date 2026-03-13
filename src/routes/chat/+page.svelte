@@ -211,6 +211,7 @@
           const reader = response.body?.getReader();
           const decoder = new TextDecoder();
           let fullResponse = '';
+          let rawBody = '';
 
           if (reader) {
             while (true) {
@@ -218,6 +219,7 @@
               if (done) break;
 
               const chunk = decoder.decode(value);
+              rawBody += chunk;
               const lines = chunk.split('\n').filter(line => line.trim() !== '');
 
               for (const line of lines) {
@@ -246,6 +248,25 @@
                 }
               }
             }
+          }
+
+          // If SSE parsing produced nothing, try parsing raw body as non-streaming JSON
+          // (gateway returns non-streaming JSON error when provider fails)
+          if (!fullResponse && rawBody.trim()) {
+            try {
+              const fallback = JSON.parse(rawBody);
+              const fallbackContent = fallback.choices?.[0]?.message?.content;
+              if (fallbackContent) {
+                fullResponse = fallbackContent;
+              }
+            } catch {
+              // Not valid JSON either — leave fullResponse empty
+            }
+          }
+
+          // If still empty after all parsing, show helpful message
+          if (!fullResponse) {
+            fullResponse = 'No response from AI model. Check that Ollama is running and the selected model is pulled:\n1. Run `ollama list` to see available models\n2. Run `ollama pull <model>` to download a model\n3. Check Settings to make sure the correct model is selected';
           }
 
           // Finalize the message
