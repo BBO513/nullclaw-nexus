@@ -148,6 +148,19 @@
         // Direct mode: Stream through NullClaw gateway
         const gatewayUrl = $gatewayConfig.url || 'http://127.0.0.1:3000';
         const model = $gatewayConfig.model || 'llama3.1';
+        
+        // Check if paired before attempting to send
+        if (!$gatewayConfig.bearerToken || !$gatewayConfig.paired) {
+          messages = [...messages, {
+            role: 'assistant',
+            content: 'Not paired with gateway. Go to Settings and click "Pair Now" to enter your master key.',
+            timestamp: new Date()
+          }];
+          saveMessages();
+          sending = false;
+          return;
+        }
+        
         console.log(`Sending to ${gatewayUrl}/v1/chat/completions (streaming, model: ${model})`);
         
         streaming = true;
@@ -187,6 +200,9 @@
           if (!response.ok) {
             if (response.status === 0 || response.status === 404) {
               throw new Error('NullClaw gateway not running. Run `nullclaw serve` first.');
+            }
+            if (response.status === 401 || response.status === 403) {
+              throw new Error('Your master key is invalid or expired. Go to Settings and click "Re-pair" to enter the correct key.');
             }
             throw new Error(`Gateway error: ${response.status} ${response.statusText}`);
           }
@@ -245,7 +261,9 @@
           // Update error message with helpful instructions
           let errorContent = `Error: ${errorMsg}`;
           if (errorMsg.includes('gateway not running') || errorMsg.includes('Failed to fetch')) {
-            errorContent = `NullClaw gateway not reachable. Please:\n1. Run \`nullclaw serve\` in terminal\n2. Make sure Ollama is running: \`ollama serve\`\n3. Refresh this page`;
+            errorContent = 'NullClaw gateway not reachable. Please:\n1. Run `nullclaw serve` in terminal\n2. Make sure Ollama is running: `ollama serve`\n3. Refresh this page';
+          } else if (errorMsg.includes('master key') || errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+            errorContent = errorMsg;
           }
           
           // Update error message
