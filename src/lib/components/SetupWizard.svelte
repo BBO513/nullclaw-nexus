@@ -194,6 +194,10 @@
       error = 'Please connect to gateway first';
       return;
     }
+    if (currentStep === 4 && masterKey && !keyVerified) {
+      error = 'Please verify your master key first';
+      return;
+    }
     currentStep++;
   }
 
@@ -204,7 +208,11 @@
 
   function skip() {
     error = '';
-    if (currentStep < totalSteps) currentStep++;
+    if (currentStep < totalSteps) {
+      currentStep++;
+    } else {
+      finish();
+    }
   }
 
   function finish() {
@@ -231,13 +239,13 @@
   function getProviderBaseUrl(provider: string): string {
     switch (provider) {
       case 'ollama': return 'http://localhost:11434';
-      case 'openai': return 'https://api.openai.com';
-      case 'anthropic': return 'https://api.anthropic.com';
-      case 'groq': return 'https://api.groq.com/openai';
-      case 'together': return 'https://api.together.xyz';
-      case 'openrouter': return 'https://openrouter.ai/api';
-      case 'deepseek': return 'https://api.deepseek.com';
-      case 'mistral': return 'https://api.mistral.ai';
+      case 'openai': return 'https://api.openai.com/v1';
+      case 'anthropic': return 'https://api.anthropic.com/v1';
+      case 'groq': return 'https://api.groq.com/openai/v1';
+      case 'together': return 'https://api.together.xyz/v1';
+      case 'openrouter': return 'https://openrouter.ai/api/v1';
+      case 'deepseek': return 'https://api.deepseek.com/v1';
+      case 'mistral': return 'https://api.mistral.ai/v1';
       default: return '';
     }
   }

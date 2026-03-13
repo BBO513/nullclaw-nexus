@@ -171,7 +171,7 @@
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${$gatewayConfig.bearerToken}`
+                ...($gatewayConfig.bearerToken ? { 'Authorization': `Bearer ${$gatewayConfig.bearerToken}` } : {})
               },
               body: JSON.stringify({
                 model,
