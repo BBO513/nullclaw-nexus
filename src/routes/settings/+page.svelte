@@ -179,6 +179,18 @@
     // Sync to gateway via POST /config/provider
     syncing = true;
     syncStatus = 'idle';
+
+    if (!$gatewayConfig.bearerToken) {
+      syncStatus = 'error';
+      syncMessage = 'Settings saved locally. Pair with gateway first (enter your master key in the Setup Wizard or click Re-pair above).';
+      syncing = false;
+
+      // Clear sync status after 6 seconds (longer so user can read it)
+      if (syncTimeout) clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => { syncStatus = 'idle'; }, 6000);
+      return;
+    }
+
     try {
       const api = new GatewayAPI(gatewayUrl, $gatewayConfig.bearerToken);
       const providerPayload: Record<string, string> = {

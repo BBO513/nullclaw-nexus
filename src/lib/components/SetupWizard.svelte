@@ -144,6 +144,16 @@
           return;
         }
       } else {
+        // No master key entered — check if gateway requires auth by probing /status
+        const probeApi = new GatewayAPI(gatewayUrl);
+        const probeStatus = await probeApi.getStatus();
+        if (!probeStatus) {
+          // /status returned null (401 or error) — gateway requires auth
+          error = 'Gateway requires a master key. Enter the NULLCLAW_MASTER_KEY you used to start the gateway.';
+          keyVerified = false;
+          return;
+        }
+        // Gateway doesn't require auth (no master key set on server)
         keyVerified = true;
       }
     } catch (err) {
