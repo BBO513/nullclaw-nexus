@@ -208,7 +208,7 @@
       } else {
         syncStatus = 'error';
         // Provide actionable message for auth failures
-        if (result.message && (result.message.includes('Authorization') || result.message.includes('unauthorized') || result.message.includes('401'))) {
+        if (result.message && (result.message.includes('Authorization') || result.message.includes('unauthorized') || result.message.includes('Unauthorized') || result.message.includes('authentication') || result.message.includes('invalid token') || result.message.includes('401'))) {
           syncMessage = 'Saved locally. Your master key is invalid or expired. Click "Re-pair" above to enter the correct key.';
         } else {
           syncMessage = `Saved locally. Gateway sync failed: ${result.message}`;

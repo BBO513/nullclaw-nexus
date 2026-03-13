@@ -22,29 +22,32 @@
     pairing = true;
     error = '';
 
-    try {
-      // Verify the master key by calling /status with it as Bearer token
-      const api = new GatewayAPI($gatewayConfig.url, masterKeyInput.trim());
-      const status = await api.getStatus();
+    // Step 1: Check gateway is reachable via /health (no auth required)
+    const api = new GatewayAPI($gatewayConfig.url, masterKeyInput.trim());
+    const healthy = await api.checkHealth();
+    if (!healthy) {
+      error = 'Cannot connect to gateway. Please check that NullClaw is running.';
+      pairing = false;
+      return;
+    }
 
-      if (status) {
-        // Master key is valid — store it as bearer token
-        gatewayConfig.update(c => ({
-          ...c,
-          bearerToken: masterKeyInput.trim(),
-          paired: true,
-          connected: true
-        }));
-        
-        masterKeyInput = '';
-        show = false;
-        alert('Paired successfully! Your master key is now stored.');
-      } else {
-        error = 'Invalid master key. Make sure it matches the NULLCLAW_MASTER_KEY used to start the gateway.';
-      }
-    } catch (err) {
-      error = 'Failed to connect to gateway. Please check that NullClaw is running.';
-    } finally {
+    // Step 2: Verify master key by calling /status with it as Bearer token
+    const status = await api.getStatus();
+    if (status) {
+      // Master key is valid — store it as bearer token
+      gatewayConfig.update(c => ({
+        ...c,
+        bearerToken: masterKeyInput.trim(),
+        paired: true,
+        connected: true
+      }));
+      
+      masterKeyInput = '';
+      show = false;
+      pairing = false;
+      alert('Paired successfully! Your master key is now stored.');
+    } else {
+      error = 'Invalid master key. Make sure it matches the NULLCLAW_MASTER_KEY used to start the gateway.';
       pairing = false;
     }
   }
