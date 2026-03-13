@@ -9,7 +9,7 @@
 	import { isTauri, onGatewayStarted } from '$lib/tauri';
 	import { get } from 'svelte/store';
 
-	let showSetupWizard = false;
+	let showSetupWizard = $state(false);
 
 	onMount(async () => {
 		// Unregister all service workers to prevent caching issues (not needed in Tauri)
