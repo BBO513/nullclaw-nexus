@@ -262,6 +262,19 @@
   function runSetupWizard() {
     showSetupWizard = true;
   }
+
+  function resetSetup() {
+    if (confirm('This will clear all setup data and show the wizard again. Continue?')) {
+      localStorage.removeItem('setup-wizard-completed');
+      gatewayConfig.update(c => ({
+        ...c,
+        bearerToken: null,
+        paired: false,
+        connected: false
+      }));
+      showSetupWizard = true;
+    }
+  }
 </script>
 
 <SetupWizard bind:show={showSetupWizard} />
@@ -558,12 +571,20 @@
 
       <!-- Save Button -->
       <div class="flex justify-between items-center">
-        <button
-          on:click={runSetupWizard}
-          class="px-6 py-3 glass hover:bg-nebula-card rounded-lg font-semibold"
-        >
-          Run Setup Wizard
-        </button>
+        <div class="flex gap-3">
+          <button
+            on:click={runSetupWizard}
+            class="px-6 py-3 glass hover:bg-nebula-card rounded-lg font-semibold"
+          >
+            Run Setup Wizard
+          </button>
+          <button
+            on:click={resetSetup}
+            class="px-6 py-3 glass hover:bg-red-500/20 text-red-400 rounded-lg font-semibold text-sm"
+          >
+            Reset Setup
+          </button>
+        </div>
         <button
           on:click={saveSettings}
           disabled={syncing}

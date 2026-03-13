@@ -3,13 +3,13 @@
 	import ErrorBoundary from '$lib/components/ErrorBoundary.svelte';
 	import OfflineIndicator from '$lib/components/OfflineIndicator.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
+	import SetupWizard from '$lib/components/SetupWizard.svelte';
 	import { onMount } from 'svelte';
 	import { gatewayConfig, autoDiscoverGateway } from '$lib/stores/gateway';
-	import { GatewayAPI } from '$lib/api/gateway';
 	import { isTauri, onGatewayStarted } from '$lib/tauri';
 	import { get } from 'svelte/store';
 
-	let autoPairingAttempted = false;
+	let showSetupWizard = false;
 
 	onMount(async () => {
 		// Unregister all service workers to prevent caching issues (not needed in Tauri)
@@ -36,31 +36,12 @@
 			});
 		}
 
-		// Auto-pair on first launch if no token exists
+		// Show setup wizard on first launch if not completed yet
+		const setupCompleted = localStorage.getItem('setup-wizard-completed');
 		const config = get(gatewayConfig);
-		if (!config.bearerToken && !config.paired && !autoPairingAttempted) {
-			autoPairingAttempted = true;
-			console.log('[Auto-Pair] No token found, attempting auto-pairing with master key...');
-			
-			try {
-				const api = new GatewayAPI(config.url);
-				const result = await api.pairWithMasterKey('NULLCLAW-CREATOR-UNLIMITED');
-				
-				if (result && result.token) {
-					gatewayConfig.update(c => ({
-						...c,
-						bearerToken: result.token,
-						paired: true,
-						connected: true
-					}));
-					console.log('[Auto-Pair] Successfully auto-paired with master key');
-				} else {
-					console.log('[Auto-Pair] Master key pairing failed, user will need to pair manually');
-				}
-			} catch (error) {
-				console.log('[Auto-Pair] Auto-pairing failed:', error);
-				// Silent fail - user can pair manually later
-			}
+		if (!setupCompleted && !config.bearerToken) {
+			showSetupWizard = true;
+			console.log('[Setup] First launch detected, showing setup wizard');
 		}
 	});
 </script>
@@ -75,6 +56,7 @@
 </svelte:head>
 
 <ErrorBoundary>
+	<SetupWizard bind:show={showSetupWizard} />
 	<OfflineIndicator />
 	<InstallPrompt />
 	<div class="dark min-h-screen">

@@ -10,7 +10,14 @@ const config = {
 			fallback: 'index.html',
 			precompress: false,
 			strict: true
-		})
+		}),
+		prerender: {
+			handleHttpError: ({ path }) => {
+				// Ignore favicon 404 during prerender — not a real issue for SPA
+				if (path === '/favicon.ico') return;
+				throw new Error(`${path} not found`);
+			}
+		}
 	},
 	compilerOptions: {
 		runes: true  // Enable Svelte 5 runes mode ($state, $derived, $effect)
