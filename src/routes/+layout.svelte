@@ -36,13 +36,7 @@
 			});
 		}
 
-		// Show setup wizard on first launch if not completed yet
-		const setupCompleted = localStorage.getItem('setup-wizard-completed');
-		const config = get(gatewayConfig);
-		if (!setupCompleted && !config.bearerToken) {
-			showSetupWizard = true;
-			console.log('[Setup] First launch detected, showing setup wizard');
-		}
+		// Setup wizard disabled - using direct config
 	});
 </script>
 
@@ -56,7 +50,7 @@
 </svelte:head>
 
 <ErrorBoundary>
-	<SetupWizard bind:show={showSetupWizard} />
+	<!-- <SetupWizard bind:show={showSetupWizard} /> -->
 	<OfflineIndicator />
 	<InstallPrompt />
 	<div class="dark min-h-screen">
