@@ -124,7 +124,11 @@ async function scanLanForGateway(): Promise<string | null> {
     '10.0.0.1', '10.0.0.2', '10.0.1.1',
     '172.16.0.1', '172.16.0.2',
     // WSL gateway IPs (common ranges)
-    '172.30.80.1', '172.17.0.1', '172.18.0.1',
+    '172.30.80.1', '172.30.81.57', '172.17.0.1', '172.18.0.1',
+    // Android emulator host aliases
+    '10.0.2.2',
+    // WSL default gateway (Windows host from inside WSL)
+    '10.255.255.254',
   ];
 
   // Probe candidates in parallel batches of 4 for speed
