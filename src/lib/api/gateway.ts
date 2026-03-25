@@ -158,11 +158,30 @@ export class GatewayAPI {
   }
 
   async getOllamaModels(): Promise<string[]> {
+    // First try via the gateway's /models endpoint (works on mobile/remote)
     try {
-      const response = await fetch('http://localhost:11434/api/tags');
+      const response = await fetch(`${this.baseUrl}/models`, {
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.models && data.models.length > 0) {
+          return data.models;
+        }
+      }
+    } catch {
+      // Gateway /models not available, fall through to direct Ollama
+    }
+
+    // Fallback: try direct Ollama connection (works when running locally)
+    try {
+      const response = await fetch('http://localhost:11434/api/tags', {
+        signal: AbortSignal.timeout(3000)
+      });
       if (!response.ok) return [];
       const data = await response.json();
-      return data.models?.map((m: any) => m.name) || [];
+      return data.models?.map((m: { name: string }) => m.name) || [];
     } catch {
       return [];
     }

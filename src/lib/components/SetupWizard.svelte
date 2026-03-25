@@ -76,7 +76,7 @@
     loadingMessage = 'Detecting Ollama...';
     
     try {
-      const api = new GatewayAPI();
+      const api = new GatewayAPI(gatewayUrl || $gatewayConfig.url, $gatewayConfig.bearerToken);
       const models = await api.getOllamaModels();
       availableOllamaModels = models;
       ollamaDetected = models.length > 0;
