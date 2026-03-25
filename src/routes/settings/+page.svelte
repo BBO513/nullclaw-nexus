@@ -227,7 +227,7 @@
 
   async function checkOllama() {
     try {
-      const api = new GatewayAPI();
+      const api = new GatewayAPI($gatewayConfig.url, $gatewayConfig.bearerToken);
       const models = await api.getOllamaModels();
       availableOllamaModels = models;
       ollamaDetected = models.length > 0;
