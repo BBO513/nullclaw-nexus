@@ -167,7 +167,7 @@ export class GatewayAPI {
       if (response.ok) {
         const data = await response.json();
         if (data.models && data.models.length > 0) {
-          return data.models;
+          return data.models.map((m: string | { name: string }) => typeof m === 'string' ? m : m.name);
         }
       }
     } catch {
